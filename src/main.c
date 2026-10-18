@@ -40,7 +40,8 @@ void generate_sine_wave(float frequency, int num_samples, float sample_rate, flo
 
 int main(){
 
-  write_test_file("test.bin");
+  // write_test_file("test.bin");
+  write_silent_wav("silent.wav");
 
   return 0;
 
