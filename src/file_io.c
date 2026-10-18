@@ -45,7 +45,7 @@ int write_silent_wav(const char *filename){
   uint32_t subchunk2_size = 96000;
   fwrite(&subchunk2_size, sizeof(subchunk2_size), 1, file);
 
-  // TODO: write silence to array
+  // fill sounds with silence
 
   // - print file size
   // Ensure all buffered data is written to the file descriptor
