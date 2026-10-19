@@ -1,4 +1,5 @@
 #include <math.h>
+#include "oscillator.h"
 
 #define PI 3.14159265358979323846
 
@@ -9,4 +10,3 @@ void generate_sine_wave(float frequency, int num_samples, float sample_rate, flo
     samples[n] = sin(2.0 * PI * frequency * ((float)n / sample_rate));
   }
 }
-

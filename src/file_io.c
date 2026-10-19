@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <sys/types.h>
+#include "file_io.h"
 
 #define BIT_PCM_16 32767
 
@@ -109,9 +110,6 @@ int write_wav(const char *filename, const float *samples, uint32_t num_frames){
   for(uint32_t frame = 0; frame < num_frames; frame++){
     int16_t sound = samples[frame] * BIT_PCM_16;
 
-    if (frame < 10) {
-      printf("frame: %d sound: %d sample: %f\n", frame, sound, samples[frame]);
-    }
     if ( fwrite(&sound, sizeof(sound), 1, file) != 1) {
       fclose(file);
       return 2;
