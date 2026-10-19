@@ -6,7 +6,11 @@
 #define BIT_PCM_16 32767
 
 // mono only
-int write_wav(const char *filename, const float *samples, uint32_t num_frames, uint32_t sample_rate){
+int write_wav(const char *filename, 
+              float *samples, 
+              uint32_t num_frames, 
+              uint32_t sample_rate){
+
   FILE *file = fopen(filename, "wb");
 
   // fundamentals 
