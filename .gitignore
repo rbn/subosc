@@ -1,0 +1,11 @@
+# Compiled output
+build/
+*.o
+*.out
+
+# Debugging
+core
+core.*
+
+# Generated audio files
+*.wav
