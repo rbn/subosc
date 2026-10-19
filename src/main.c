@@ -21,38 +21,31 @@ void print_samples_range(float *samples, int start, int count){
 }
 
 void diagnostics(float *samples){
-    // 100Hz
-  printf("100 Hz\n");
-  generate_sine_wave(100, NUM_SAMPLES, SAMPLE_RATE, samples);
 
-  // 0, 120, 240, 360, and 480 f
   print_samples_range(samples, 0, 1);
   print_samples_range(samples, 120, 1);
   print_samples_range(samples, 240, 1);
   print_samples_range(samples, 360, 1);
   print_samples_range(samples, 480, 1);
 
-  // 200Hz
-  printf("200 Hz\n");
-  generate_sine_wave(200, NUM_SAMPLES, SAMPLE_RATE, samples);
-
-
-  // 0, 120, 240, 360, and 480 f
-  print_samples_range(samples, 0, 1);
-  print_samples_range(samples, 120, 1);
-  print_samples_range(samples, 240, 1);
-  print_samples_range(samples, 360, 1);
-  print_samples_range(samples, 480, 1);
 }
 
 int main(){
   printf("hello from main\n");
 
   float samples[NUM_SAMPLES];
+
   generate_sine_wave(100, NUM_SAMPLES, SAMPLE_RATE, samples);
-  write_wav("bass.wav", samples, NUM_SAMPLES, SAMPLE_RATE);
+  // diagnostics(samples);
 
   if (write_wav("bass.wav", samples, NUM_SAMPLES, SAMPLE_RATE) != 0){
+    fprintf(stderr, "Error writing wav file\n");
+    return 1;
+  }
+
+  generate_saw_wave(100, NUM_SAMPLES, SAMPLE_RATE, samples);
+
+  if (write_wav("saw.wav", samples, NUM_SAMPLES, SAMPLE_RATE) != 0){
     fprintf(stderr, "Error writing wav file\n");
     return 1;
   }
