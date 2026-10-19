@@ -1,12 +1,10 @@
 #include <stdio.h>
-#include <math.h>
 #include "file_io.h"
+#include "oscillator.h"
 
-#define PI 3.14159265358979323846
 #define SAMPLE_RATE 48000
-#define FREQUENCY 440.0
 #define NUM_SAMPLES 48000
-
+#define FREQUENCY 440.0
 
 void reset_samples(float *samples, int num_samples){
 
@@ -29,27 +27,9 @@ void print_samples_range(float *samples, int start, int count){
     printf("%d. samples[%d] is %f\n", n + 1, start + n, samples[start + n]);
   }
 }
-// s[n] = sin ( 2*pi*frequency * (sample index/sample rate))
-void generate_sine_wave(float frequency, int num_samples, float sample_rate, float *samples){
 
-  for(int n = 0; n < num_samples; n++){
-    samples[n] = sin(2.0 * PI * frequency * ((float)n / sample_rate));
-  }
-}
-
-
-int main(){
-
-  // write_test_file("test.bin");
-  write_silent_wav("silent.wav");
-
-  return 0;
-
-
-  // setup
-  float samples[NUM_SAMPLES];
-
-  // 100Hz
+void diagnostics(float *samples){
+    // 100Hz
   printf("100 Hz\n");
   reset_samples(samples, NUM_SAMPLES);
   generate_sine_wave(100, NUM_SAMPLES, SAMPLE_RATE, samples);
@@ -75,7 +55,18 @@ int main(){
   print_samples_range(samples, 240, 1);
   print_samples_range(samples, 360, 1);
   print_samples_range(samples, 480, 1);
+}
 
+int main(){
+  printf("hello from main\n");
+
+  float samples[NUM_SAMPLES];
+  reset_samples(samples, NUM_SAMPLES);
+  generate_sine_wave(100, NUM_SAMPLES, SAMPLE_RATE, samples);
+
+  print_samples(samples, 10);
+
+  write_wav("bass.wav", samples, NUM_SAMPLES);
 
   return 0;
 }
