@@ -51,10 +51,9 @@ int main(){
   float samples[NUM_SAMPLES];
   generate_sine_wave(100, NUM_SAMPLES, SAMPLE_RATE, samples);
 
-  print_samples(samples, 10);
-
-  if (write_wav("bass.wav", samples, NUM_SAMPLES) != 0){
+  if (write_wav("bass.wav", samples, NUM_SAMPLES, sample_rate) != 0){
     fprintf(stderr, "Error writing wav file\n");
+    return 1;
   }
 
   return 0;

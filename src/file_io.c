@@ -6,7 +6,7 @@
 #define BIT_PCM_16 32767
 
 // mono only
-int write_wav(const char *filename, const float *samples, uint32_t num_frames){
+int write_wav(const char *filename, const float *samples, uint32_t num_frames, uint32_t sample_rate){
   FILE *file = fopen(filename, "wb");
 
   // fundamentals 
@@ -14,7 +14,6 @@ int write_wav(const char *filename, const float *samples, uint32_t num_frames){
   uint16_t audio_format = 1;
   uint16_t num_channels = 1;
   uint16_t bits_per_sample = 16;
-  uint32_t sample_rate =  48000;
 
   // derived values
   uint16_t block_align = num_channels * (bits_per_sample / 8);

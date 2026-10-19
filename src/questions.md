@@ -1,1 +1,4 @@
-* why do system calls automatically write in little endian (e.g. ints) on this system
+- why do system calls automatically write in little endian (e.g. ints) on this system
+- TODO: error handling refactor in file_io.c
+- TODO: reject amplitudes outside valid PCM range
+- TOOD: remove wav files from git/github (git rm --cached)
