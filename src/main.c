@@ -31,24 +31,54 @@ void diagnostics(float *samples){
 }
 
 int main(){
-  printf("hello from main\n");
 
+  Oscillator osc = {
+    .frequency = 110.5f,
+    .sample_rate = SAMPLE_RATE,
+    .phase = 0.0f
+  };
+
+  printf("Oscillator frequency and phase: %f %f\n", osc.frequency, osc.phase);
   float samples[NUM_SAMPLES];
 
-  generate_sine_wave(100, NUM_SAMPLES, SAMPLE_RATE, samples);
-  // diagnostics(samples);
-
-  if (write_wav("bass.wav", samples, NUM_SAMPLES, SAMPLE_RATE) != 0){
-    fprintf(stderr, "Error writing wav file\n");
-    return 1;
+  for(int n = 0; n < NUM_SAMPLES / 2; n++){
+    samples[n] = oscillator_next_saw(&osc);
   }
 
-  generate_saw_wave(100, NUM_SAMPLES, SAMPLE_RATE, samples);
+  for(int n = NUM_SAMPLES / 2; n < NUM_SAMPLES; n++){
+    samples[n] = oscillator_next_saw(&osc);
+  }
 
   if (write_wav("saw.wav", samples, NUM_SAMPLES, SAMPLE_RATE) != 0){
     fprintf(stderr, "Error writing wav file\n");
     return 1;
   }
+
+  // generate_sine_wave(100, NUM_SAMPLES, SAMPLE_RATE, samples);
+  // // diagnostics(samples);
+
+  // if (write_wav("bass.wav", samples, NUM_SAMPLES, SAMPLE_RATE) != 0){
+  //   fprintf(stderr, "Error writing wav file\n");
+  //   return 1;
+  // }
+
+  // SAW WAVE
+
+  // generate_saw_wave(100, NUM_SAMPLES, SAMPLE_RATE, samples);
+
+  // if (write_wav("saw.wav", samples, NUM_SAMPLES, SAMPLE_RATE) != 0){
+  //   fprintf(stderr, "Error writing wav file\n");
+  //   return 1;
+  // }
+
+  // SQUARE WAVE
+  // generate_square_wave(100, NUM_SAMPLES, SAMPLE_RATE, samples);
+  // //diagnostics(samples);
+
+  // if (write_wav("square.wav", samples, NUM_SAMPLES, SAMPLE_RATE) != 0){
+  //   fprintf(stderr, "Error writing wav file\n");
+  //   return 1;
+  // }
 
   return 0;
 }

@@ -21,3 +21,22 @@ void generate_saw_wave(float frequency, int num_samples, float sample_rate, floa
     samples[n] = 2.0f * phase - 1.0f;
   }
 }
+
+void generate_square_wave(float frequency, int num_samples, float sample_rate, float *samples){
+
+  for(int n = 0; n < num_samples; n++){
+    float elapsed_cycles = frequency * (n / sample_rate); 
+    float phase = elapsed_cycles - floorf(elapsed_cycles);
+
+    samples[n] = phase < 0.5f ? 1.0f : -1.0f;
+  }
+}
+
+float oscillator_next_saw(Oscillator *osc){
+  float amplitude = 2.0f * osc->phase - 1.0f; 
+  float phase_increment = osc->frequency / osc->sample_rate;
+  osc->phase += phase_increment;
+  osc->phase -= floorf(osc->phase);
+  return amplitude;
+}
+
