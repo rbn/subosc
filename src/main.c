@@ -35,10 +35,10 @@ int main(){
   Oscillator osc = {
     .frequency = 110.5f,
     .sample_rate = SAMPLE_RATE,
-    .phase = 0.0f
+    .phase = 0.0f,
+    .waveform = WAVE_SINE
   };
 
-  printf("Oscillator frequency and phase: %f %f\n", osc.frequency, osc.phase);
   float samples[NUM_SAMPLES];
 
   for(int n = 0; n < NUM_SAMPLES / 2; n++){
@@ -54,6 +54,23 @@ int main(){
     return 1;
   }
 
+  for(int n = 0; n < NUM_SAMPLES; n++){
+    samples[n] = oscillator_next_saw(&osc);
+  }
+
+  if (write_wav("sin.wav", samples, NUM_SAMPLES, SAMPLE_RATE) != 0){
+    fprintf(stderr, "Error writing wav file\n");
+    return 1;
+  }
+
+  for(int n = 0; n < NUM_SAMPLES; n++){
+    samples[n] = oscillator_next_square(&osc);
+  }
+
+  if (write_wav("square.wav", samples, NUM_SAMPLES, SAMPLE_RATE) != 0){
+    fprintf(stderr, "Error writing wav file\n");
+    return 1;
+  }
   // generate_sine_wave(100, NUM_SAMPLES, SAMPLE_RATE, samples);
   // // diagnostics(samples);
 
