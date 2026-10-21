@@ -19,6 +19,27 @@ static void oscillator_advance(Oscillator *osc)
     osc->phase -= floorf(osc->phase);
 }
 
+static float oscillator_next_sine(Oscillator *osc)
+{
+    float amplitude = sinf(2.0f * PI * osc->phase);
+    oscillator_advance(osc);
+    return amplitude;
+}
+
+static float oscillator_next_saw(Oscillator *osc)
+{
+    float amplitude = 2.0f * osc->phase - 1.0f;
+    oscillator_advance(osc);
+    return amplitude;
+}
+
+static float oscillator_next_square(Oscillator *osc)
+{
+    float amplitude = osc->phase < 0.5f ? 1.0f : -1.0f;
+    oscillator_advance(osc);
+    return amplitude;
+}
+
 float oscillator_next(Oscillator *osc)
 {
     switch (osc->waveform)
@@ -37,23 +58,10 @@ float oscillator_next(Oscillator *osc)
     }
 }
 
-float oscillator_next_sine(Oscillator *osc)
+void oscillator_render(Oscillator *osc, float *output, int num_frames)
 {
-    float amplitude = sinf(2.0f * PI * osc->phase);
-    oscillator_advance(osc);
-    return amplitude;
-}
-
-float oscillator_next_saw(Oscillator *osc)
-{
-    float amplitude = 2.0f * osc->phase - 1.0f;
-    oscillator_advance(osc);
-    return amplitude;
-}
-
-float oscillator_next_square(Oscillator *osc)
-{
-    float amplitude = osc->phase < 0.5f ? 1.0f : -1.0f;
-    oscillator_advance(osc);
-    return amplitude;
+    for (int n = 0; n < num_frames; n++)
+    {
+        output[n] = oscillator_next(osc);
+    }
 }
