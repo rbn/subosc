@@ -33,7 +33,7 @@ void diagnostics(float *samples){
 int main(){
 
   Oscillator osc = {
-    .frequency = 110.5f,
+    .frequency = 100.0f,
     .sample_rate = SAMPLE_RATE,
     .phase = 0.0f,
     .waveform = WAVE_SINE
@@ -41,21 +41,8 @@ int main(){
 
   float samples[NUM_SAMPLES];
 
-  for(int n = 0; n < NUM_SAMPLES / 2; n++){
-    samples[n] = oscillator_next_saw(&osc);
-  }
-
-  for(int n = NUM_SAMPLES / 2; n < NUM_SAMPLES; n++){
-    samples[n] = oscillator_next_saw(&osc);
-  }
-
-  if (write_wav("saw.wav", samples, NUM_SAMPLES, SAMPLE_RATE) != 0){
-    fprintf(stderr, "Error writing wav file\n");
-    return 1;
-  }
-
   for(int n = 0; n < NUM_SAMPLES; n++){
-    samples[n] = oscillator_next_saw(&osc);
+    samples[n] = oscillator_next(&osc);
   }
 
   if (write_wav("sin.wav", samples, NUM_SAMPLES, SAMPLE_RATE) != 0){
@@ -63,8 +50,24 @@ int main(){
     return 1;
   }
 
+  osc.waveform = WAVE_SAW;
+  osc.phase = 0;
+
   for(int n = 0; n < NUM_SAMPLES; n++){
-    samples[n] = oscillator_next_square(&osc);
+    samples[n] = oscillator_next(&osc);
+  }
+
+  if (write_wav("saw.wav", samples, NUM_SAMPLES, SAMPLE_RATE) != 0){
+    fprintf(stderr, "Error writing wav file\n");
+    return 1;
+  }
+
+
+  osc.waveform = WAVE_SQUARE;
+  osc.phase = 0;
+
+  for(int n = 0; n < NUM_SAMPLES; n++){
+    samples[n] = oscillator_next(&osc);
   }
 
   if (write_wav("square.wav", samples, NUM_SAMPLES, SAMPLE_RATE) != 0){
