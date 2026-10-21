@@ -1,0 +1,30 @@
+BasedOnStyle: LLVM
+
+# Indentation
+IndentWidth: 4
+UseTab: Never
+ContinuationIndentWidth: 4
+
+# Braces
+BreakBeforeBraces: Allman
+KeepEmptyLinesAtTheStartOfBlocks: false
+
+# Line length
+ColumnLimit: 100
+
+# Pointers
+PointerAlignment: Right
+
+# Function calls
+BinPackArguments: false
+BinPackParameters: false
+
+# Spacing
+SpaceBeforeParens: ControlStatements
+SpacesInParentheses: false
+
+# Blank lines
+MaxEmptyLinesToKeep: 1
+
+# Include ordering
+SortIncludes: Never
