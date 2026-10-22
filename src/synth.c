@@ -6,6 +6,6 @@ void synth_render(Synth *synth, float *output, int num_frames)
 
     for (int n = 0; n < num_frames; n++)
     {
-        output[n] *= synth->gain;
+        output[n] *= envelope_next(&synth->envelope) * synth->gain;
     }
 }

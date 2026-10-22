@@ -2,10 +2,12 @@
 #define SYNTH_H
 
 #include "oscillator.h"
+#include "envelope.h"
 
 typedef struct
 {
     Oscillator oscillator;
+    Envelope envelope;
     float gain;
 } Synth;
 
