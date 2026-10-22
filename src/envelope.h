@@ -1,6 +1,14 @@
 #ifndef ENVELOPE_H
 #define ENVELOPE_H
 
+typedef enum
+{
+    ENV_IDLE,
+    ENV_ATTACK,
+    ENV_SUSTAIN,
+    ENV_RELEASE,
+} EnvelopeState; // TODO: left off here
+
 typedef struct
 {
     float level;
