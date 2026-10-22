@@ -6,6 +6,7 @@
 #define SAMPLE_RATE 48000
 #define NUM_SAMPLES 48000
 #define FREQUENCY 440.0
+#define OUTPUT_GAIN 0.2f
 
 void print_samples(float *samples, int count)
 {
@@ -41,6 +42,11 @@ audio_callback(ma_device *device, void *output, const void *input, ma_uint32 fra
     (void)input;
 
     oscillator_render(osc, samples, (int)frame_count);
+
+    for (ma_uint32 n = 0; n < frame_count; n++)
+    {
+        samples[n] *= OUTPUT_GAIN;
+    }
 }
 
 int main()
