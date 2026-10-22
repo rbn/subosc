@@ -1,6 +1,7 @@
 #include "file_io.h"
 #include "oscillator.h"
 #include <stdio.h>
+#include "../third_party/miniaudio.h"
 
 #define SAMPLE_RATE 48000
 #define NUM_SAMPLES 48000
@@ -31,53 +32,47 @@ void diagnostics(float *samples)
     print_samples_range(samples, 480, 1);
 }
 
+static void
+audio_callback(ma_device *device, void *output, const void *input, ma_uint32 frame_count)
+{
+    Oscillator *osc = device->pUserData;
+    float *samples = output;
+
+    (void)input;
+
+    oscillator_render(osc, samples, (int)frame_count);
+}
+
 int main()
 {
     Oscillator osc = {
         .frequency = 100.0f, .sample_rate = SAMPLE_RATE, .phase = 0.0f, .waveform = WAVE_SINE};
 
-    float samples[NUM_SAMPLES];
+    ma_device_config config = ma_device_config_init(ma_device_type_playback);
+    config.playback.format = ma_format_f32;
+    config.playback.channels = 1;
+    config.sampleRate = SAMPLE_RATE;
+    config.dataCallback = audio_callback;
+    config.pUserData = &osc;
 
-    // for (int n = 0; n < NUM_SAMPLES; n++)
-    // {
-    //     samples[n] = oscillator_next(&osc);
-    // }
+    ma_device device;
 
-    oscillator_render(&osc, samples, NUM_SAMPLES);
-
-    if (write_wav("sin.wav", samples, NUM_SAMPLES, SAMPLE_RATE) != 0)
+    if (ma_device_init(NULL, &config, &device) != MA_SUCCESS)
     {
-        fprintf(stderr, "Error writing wav file\n");
+        fprintf(stderr, "Failed to initialize audio device\n");
         return 1;
     }
 
-    // osc.waveform = WAVE_SAW;
-    // osc.phase = 0;
+    if (ma_device_start(&device) != MA_SUCCESS)
+    {
+        fprintf(stderr, "Failied to start audio device\n");
+        ma_device_uninit(&device);
+        return 1;
+    }
 
-    // for (int n = 0; n < NUM_SAMPLES; n++)
-    // {
-    //     samples[n] = oscillator_next(osc);
-    // }
+    printf("Playing. Press Enter to stop.\n");
+    getchar();
 
-    // if (write_wav("saw.wav", samples, NUM_SAMPLES, SAMPLE_RATE) != 0)
-    // {
-    //     fprintf(stderr, "Error writing wav file\n");
-    //     return 1;
-    // }
-
-    // osc.waveform = WAVE_SQUARE;
-    // osc.phase = 0;
-
-    // for (int n = 0; n < NUM_SAMPLES; n++)
-    // {
-    //     samples[n] = oscillator_next(&osc);
-    // }
-
-    // if (write_wav("square.wav", samples, NUM_SAMPLES, SAMPLE_RATE) != 0)
-    // {
-    //     fprintf(stderr, "Error writing wav file\n");
-    //     return 1;
-    // }
-
+    ma_device_uninit(&device);
     return 0;
 }
