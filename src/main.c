@@ -57,6 +57,12 @@ int main()
 
     Synth synth = {
         .oscillator = osc,
+        .envelope =
+            {
+                .level = 0.0f,
+                .attack_seconds = 5.0f,
+                .sample_rate = SAMPLE_RATE,
+            },
         .gain = OUTPUT_GAIN,
     };
 
