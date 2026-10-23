@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include "../third_party/miniaudio.h"
 #include "synth.h"
+#include <stdatomic.h>
 
 #define SAMPLE_RATE 48000
 #define NUM_SAMPLES 48000
@@ -35,57 +36,73 @@ void diagnostics(float *samples)
     print_samples_range(samples, 480, 1);
 }
 
+typedef enum
+{
+    COMMAND_NONE,
+    COMMAND_NOTE_ON,
+    COMMAND_NOTE_OFF,
+} Command;
+
+typedef struct
+{
+    Synth synth;
+    atomic_int pending_command;
+} AppState;
+
 static void audio_callback(ma_device *device,
                            void *output,
                            const void *input,
                            ma_uint32 frame_count)
 {
-    Synth *synth = device->pUserData;
-    static ma_uint64 frames_rendered = 0;
-    static int released = 0;
+    AppState *app = device->pUserData;
 
     (void)input;
 
-    if (!released && frames_rendered >= SAMPLE_RATE * 4)
+    int command = atomic_exchange(&app->pending_command, COMMAND_NONE);
+
+    switch (command)
     {
-        envelope_note_off(&synth->envelope);
-        released = 1;
+    case COMMAND_NOTE_ON:
+        envelope_note_on(&app->synth.envelope);
+        break;
+    case COMMAND_NOTE_OFF:
+        envelope_note_off(&app->synth.envelope);
+        break;
     }
 
-    synth_render(synth, output, (int)frame_count);
-    frames_rendered += frame_count;
+    synth_render(&app->synth, output, (int)frame_count);
 }
 
 int main()
 {
     Oscillator osc = {
-        .frequency = 220.0f,
+        .frequency = 440.0f,
         .sample_rate = SAMPLE_RATE,
         .phase = 0.0f,
         .waveform = WAVE_SINE,
     };
 
-    Synth synth = {
-        .oscillator = osc,
-        .envelope =
-            {
-                .level = 0.0f,
-                .attack_seconds = 2.0f,
-                .sample_rate = SAMPLE_RATE,
-                .state = ENV_IDLE,
-                .release_seconds = 1.0f,
-            },
-        .gain = OUTPUT_GAIN,
-    };
+    AppState app = {.synth = {
+                        .oscillator = osc,
+                        .envelope =
+                            {
+                                .level = 0.0f,
+                                .attack_seconds = 2.0f,
+                                .release_seconds = 1.0f,
+                                .sample_rate = SAMPLE_RATE,
+                                .state = ENV_IDLE,
+                            },
+                        .gain = OUTPUT_GAIN,
+                    }};
 
-    envelope_note_on(&synth.envelope);
+    atomic_init(&app.pending_command, COMMAND_NONE);
 
     ma_device_config config = ma_device_config_init(ma_device_type_playback);
     config.playback.format = ma_format_f32;
     config.playback.channels = 1;
     config.sampleRate = SAMPLE_RATE;
     config.dataCallback = audio_callback;
-    config.pUserData = &synth;
+    config.pUserData = &app;
 
     ma_device device;
 
@@ -102,8 +119,23 @@ int main()
         return 1;
     }
 
-    printf("Playing. Press Enter to stop.\n");
-    getchar();
+    printf("n + Enter: note on\n");
+    printf("r + Enter: release\n");
+    printf("q + Enter: quit\n");
+    int key;
+
+    while ((key = getchar()) != EOF && key != 'q')
+    {
+        switch (key)
+        {
+        case 'n':
+            atomic_store(&app.pending_command, COMMAND_NOTE_ON);
+            break;
+        case 'r':
+            atomic_store(&app.pending_command, COMMAND_NOTE_OFF);
+            break;
+        }
+    }
 
     ma_device_uninit(&device);
     return 0;
