@@ -1,3 +1,4 @@
+#include "envelope.h"
 #include "file_io.h"
 #include "oscillator.h"
 #include <stdio.h>
@@ -40,16 +41,25 @@ static void audio_callback(ma_device *device,
                            ma_uint32 frame_count)
 {
     Synth *synth = device->pUserData;
+    static ma_uint64 frames_rendered = 0;
+    static int released = 0;
 
     (void)input;
 
+    if (!released && frames_rendered >= SAMPLE_RATE * 4)
+    {
+        envelope_note_off(&synth->envelope);
+        released = 1;
+    }
+
     synth_render(synth, output, (int)frame_count);
+    frames_rendered += frame_count;
 }
 
 int main()
 {
     Oscillator osc = {
-        .frequency = 100.0f,
+        .frequency = 220.0f,
         .sample_rate = SAMPLE_RATE,
         .phase = 0.0f,
         .waveform = WAVE_SINE,
@@ -60,11 +70,15 @@ int main()
         .envelope =
             {
                 .level = 0.0f,
-                .attack_seconds = 5.0f,
+                .attack_seconds = 2.0f,
                 .sample_rate = SAMPLE_RATE,
+                .state = ENV_IDLE,
+                .release_seconds = 1.0f,
             },
         .gain = OUTPUT_GAIN,
     };
+
+    envelope_note_on(&synth.envelope);
 
     ma_device_config config = ma_device_config_init(ma_device_type_playback);
     config.playback.format = ma_format_f32;
