@@ -7,15 +7,19 @@ typedef enum
     ENV_ATTACK,
     ENV_SUSTAIN,
     ENV_RELEASE,
-} EnvelopeState; // TODO: left off here
+} EnvelopeState;
 
 typedef struct
 {
     float level;
     float attack_seconds;
     float sample_rate;
+    EnvelopeState state;
+    float release_seconds;
 } Envelope;
 
 float envelope_next(Envelope *env);
+void envelope_note_on(Envelope *env);
+void envelope_note_off(Envelope *env);
 
 #endif
