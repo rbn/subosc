@@ -2,3 +2,4 @@
 - TODO: error handling refactor in file_io.c
 - TODO: reject amplitudes outside valid PCM range
 - TOOD: remove wav files from git/github (git rm --cached)
+- TODO: add an oscilliscope (nice to have)
