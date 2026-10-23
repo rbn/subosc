@@ -2,10 +2,12 @@
 #include "oscillator.h"
 #include <stdio.h>
 #include "../third_party/miniaudio.h"
+#include "synth.h"
 
 #define SAMPLE_RATE 48000
 #define NUM_SAMPLES 48000
 #define FREQUENCY 440.0
+#define OUTPUT_GAIN 0.2f
 
 void print_samples(float *samples, int count)
 {
@@ -32,28 +34,44 @@ void diagnostics(float *samples)
     print_samples_range(samples, 480, 1);
 }
 
-static void
-audio_callback(ma_device *device, void *output, const void *input, ma_uint32 frame_count)
+static void audio_callback(ma_device *device,
+                           void *output,
+                           const void *input,
+                           ma_uint32 frame_count)
 {
-    Oscillator *osc = device->pUserData;
-    float *samples = output;
+    Synth *synth = device->pUserData;
 
     (void)input;
 
-    oscillator_render(osc, samples, (int)frame_count);
+    synth_render(synth, output, (int)frame_count);
 }
 
 int main()
 {
     Oscillator osc = {
-        .frequency = 100.0f, .sample_rate = SAMPLE_RATE, .phase = 0.0f, .waveform = WAVE_SINE};
+        .frequency = 100.0f,
+        .sample_rate = SAMPLE_RATE,
+        .phase = 0.0f,
+        .waveform = WAVE_SINE,
+    };
+
+    Synth synth = {
+        .oscillator = osc,
+        .envelope =
+            {
+                .level = 0.0f,
+                .attack_seconds = 5.0f,
+                .sample_rate = SAMPLE_RATE,
+            },
+        .gain = OUTPUT_GAIN,
+    };
 
     ma_device_config config = ma_device_config_init(ma_device_type_playback);
     config.playback.format = ma_format_f32;
     config.playback.channels = 1;
     config.sampleRate = SAMPLE_RATE;
     config.dataCallback = audio_callback;
-    config.pUserData = &osc;
+    config.pUserData = &synth;
 
     ma_device device;
 

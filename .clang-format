@@ -28,3 +28,8 @@ MaxEmptyLinesToKeep: 1
 
 # Include ordering
 SortIncludes: Never
+
+# function signatures
+AlwaysBreakAfterReturnType: None
+PenaltyReturnTypeOnItsOwnLine: 1000
+AllowAllParametersOfDeclarationOnNextLine: false

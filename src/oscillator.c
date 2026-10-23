@@ -9,9 +9,6 @@
 // 2.0f * phase - 1.0f              // saw
 // phase < 0.5f ? 1.0f : -1.0f     // square
 
-// -- SINE WAVE
-// s[n] = sin ( 2*pi*frequency * (sample index/sample rate))
-
 static void oscillator_advance(Oscillator *osc)
 {
     float phase_increment = osc->frequency / osc->sample_rate;
