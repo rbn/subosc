@@ -41,7 +41,9 @@ void diagnostics(float *samples)
 typedef enum
 {
     COMMAND_NONE,
-    COMMAND_NOTE_ON,
+    COMMAND_NOTE_C,
+    COMMAND_NOTE_E,
+    COMMAND_NOTE_G,
     COMMAND_NOTE_OFF,
 } Command;
 
@@ -65,11 +67,17 @@ static void audio_callback(ma_device *device,
 
     switch (command)
     {
-    case COMMAND_NOTE_ON:
-        envelope_note_on(&app->synth.envelope);
+    case COMMAND_NOTE_C:
+        synth_note_on(&app->synth, 60);
+        break;
+    case COMMAND_NOTE_E:
+        synth_note_on(&app->synth, 64);
+        break;
+    case COMMAND_NOTE_G:
+        synth_note_on(&app->synth, 67);
         break;
     case COMMAND_NOTE_OFF:
-        envelope_note_off(&app->synth.envelope);
+        synth_note_off(&app->synth);
         break;
     }
 
@@ -133,8 +141,14 @@ int main()
 
     while (!WindowShouldClose())
     {
-        if (IsKeyPressed(KEY_N))
-            atomic_store(&app.pending_command, COMMAND_NOTE_ON);
+        if (IsKeyPressed(KEY_A))
+            atomic_store(&app.pending_command, COMMAND_NOTE_C);
+
+        if (IsKeyPressed(KEY_S))
+            atomic_store(&app.pending_command, COMMAND_NOTE_E);
+
+        if (IsKeyPressed(KEY_D))
+            atomic_store(&app.pending_command, COMMAND_NOTE_G);
 
         if (IsKeyPressed(KEY_R))
             atomic_store(&app.pending_command, COMMAND_NOTE_OFF);
