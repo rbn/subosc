@@ -4,13 +4,16 @@ c_files := \
 	src/main.c \
 	src/miniaudio_impl.c \
 	src/synth.c \
-	src/envelope.c
+	src/envelope.c \
+	src/scope.c
 
 h_files := \
 	src/oscillator.h \
 	src/file_io.h third_party/miniaudio.h \
 	src/synth.h \
 	src/envelope.h \
+	src/scope.h
+
 
 CC = gcc
 CFLAGS = -Wall -Wextra -std=c11 -fdiagnostics-color=always
