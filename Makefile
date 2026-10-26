@@ -5,14 +5,16 @@ c_files := \
 	src/miniaudio_impl.c \
 	src/synth.c \
 	src/envelope.c \
-	src/scope.c
+	src/scope.c \
+	src/note.c
 
 h_files := \
 	src/oscillator.h \
 	src/file_io.h third_party/miniaudio.h \
 	src/synth.h \
 	src/envelope.h \
-	src/scope.h
+	src/scope.h \
+	src/note.h
 
 
 CC = gcc
