@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+busid=$(
+  usbipd.exe list |
+    tr -d '\r' |
+    awk '/1c75:0288/ {print $1; exit}'
+)
+
+if [[ -z "$busid" ]]; then
+  echo "KeyStep not found in Windows. Check its USB connection."
+  exit 1
+fi
+
+usbipd.exe attach --wsl --busid "$busid"
+
+echo
+amidi -l

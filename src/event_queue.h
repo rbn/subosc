@@ -15,6 +15,6 @@ typedef struct
 
 void event_queue_init(EventQueue *queue);
 int event_queue_push(EventQueue *queue, MidiEvent event);
-int event_queue_pop(EventQueue *queue, MidiEvent event);
+int event_queue_pop(EventQueue *queue, MidiEvent *event);
 
 #endif
