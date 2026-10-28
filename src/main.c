@@ -1,5 +1,6 @@
 #include "envelope.h"
 #include "file_io.h"
+#include "midi.h"
 #include "oscillator.h"
 #include <stdio.h>
 #include "../third_party/miniaudio.h"
@@ -7,6 +8,7 @@
 #include <stdatomic.h>
 #include <raylib.h>
 #include "scope.h"
+#include "event_queue.h"
 
 #define SAMPLE_RATE 48000
 #define NUM_SAMPLES 48000
@@ -52,6 +54,7 @@ typedef struct
     Synth synth;
     atomic_int pending_command;
     ScopeCapture scope;
+    EventQueue events;
 } AppState;
 
 static void audio_callback(ma_device *device,
@@ -81,6 +84,20 @@ static void audio_callback(ma_device *device,
         break;
     }
 
+    MidiEvent event;
+    while (event_queue_pop(&app->events, &event))
+    {
+        switch (event.type)
+        {
+        case MIDI_NOTE_ON:
+            synth_note_on(&app->synth, event.note);
+            break;
+        case MIDI_NOTE_OFF:
+            synth_note_off(&app->synth);
+            break;
+        }
+    }
+
     synth_render(&app->synth, output, (int)frame_count);
     scope_capture_push(&app->scope, output, (int)frame_count);
 }
@@ -107,8 +124,19 @@ int main()
                         .gain = OUTPUT_GAIN,
                     }};
 
+    event_queue_init(&app.events);
+
     atomic_init(&app.pending_command, COMMAND_NONE);
     scope_capture_init(&app.scope);
+
+    MidiInput midi;
+    int midi_result = midi_input_open(&midi, "hw:0,0,0");
+
+    if (midi_result < 0)
+    {
+        fprintf(stderr, "Failed to open MIDI input: %s\n", snd_strerror(midi_result));
+        return 1;
+    }
 
     InitWindow(800, 400, "Subosc Scope");
     SetTargetFPS(60);
@@ -126,6 +154,7 @@ int main()
     {
         fprintf(stderr, "Failed to initialize audio device\n");
         CloseWindow();
+        midi_input_close(&midi);
         return 1;
     }
 
@@ -134,6 +163,7 @@ int main()
         fprintf(stderr, "Failied to start audio device\n");
         ma_device_uninit(&device);
         CloseWindow();
+        midi_input_close(&midi);
         return 1;
     }
 
@@ -153,6 +183,22 @@ int main()
         if (IsKeyPressed(KEY_R))
             atomic_store(&app.pending_command, COMMAND_NOTE_OFF);
 
+        MidiEvent event;
+
+        while ((midi_result = midi_input_next(&midi, &event)) == 1)
+        {
+            if (!event_queue_push(&app.events, event))
+            {
+                fprintf(stderr, "MIDI event queue is full\n");
+            }
+        }
+
+        if (midi_result < 0)
+        {
+            fprintf(stderr, "MIDI read failed: %s\n", snd_strerror(midi_result));
+            break;
+        }
+
         scope_display_update(&display, &app.scope);
 
         BeginDrawing();
@@ -161,6 +207,7 @@ int main()
         EndDrawing();
     }
     ma_device_uninit(&device);
+    midi_input_close(&midi);
     CloseWindow();
     return 0;
 }
