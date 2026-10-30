@@ -15,37 +15,9 @@
 #define FREQUENCY 440.0
 #define OUTPUT_GAIN 0.2f
 
-void print_samples(float *samples, int count)
-{
-    for (int n = 0; n < count; n++)
-    {
-        printf("%d. samples[%d] is %f\n", n + 1, n, samples[n]);
-    }
-}
-
-void print_samples_range(float *samples, int start, int count)
-{
-    for (int n = 0; n < count; n++)
-    {
-        printf("%d. samples[%d] is %f\n", n + 1, start + n, samples[start + n]);
-    }
-}
-
-void diagnostics(float *samples)
-{
-    print_samples_range(samples, 0, 1);
-    print_samples_range(samples, 120, 1);
-    print_samples_range(samples, 240, 1);
-    print_samples_range(samples, 360, 1);
-    print_samples_range(samples, 480, 1);
-}
-
 typedef enum
 {
     COMMAND_NONE,
-    COMMAND_NOTE_C,
-    COMMAND_NOTE_E,
-    COMMAND_NOTE_G,
     COMMAND_NOTE_OFF,
 } Command;
 
@@ -70,17 +42,8 @@ static void audio_callback(ma_device *device,
 
     switch (command)
     {
-    case COMMAND_NOTE_C:
-        synth_note_on(&app->synth, 60);
-        break;
-    case COMMAND_NOTE_E:
-        synth_note_on(&app->synth, 64);
-        break;
-    case COMMAND_NOTE_G:
-        synth_note_on(&app->synth, 67);
-        break;
     case COMMAND_NOTE_OFF:
-        synth_note_off(&app->synth);
+        synth_all_notes_off(&app->synth);
         break;
     }
 
@@ -93,7 +56,7 @@ static void audio_callback(ma_device *device,
             synth_note_on(&app->synth, event.note);
             break;
         case MIDI_NOTE_OFF:
-            synth_note_off(&app->synth);
+            synth_note_off(&app->synth, event.note);
             break;
         }
     }
@@ -104,15 +67,14 @@ static void audio_callback(ma_device *device,
 
 int main()
 {
-    Oscillator osc = {
-        .frequency = 440.0f,
-        .sample_rate = SAMPLE_RATE,
-        .phase = 0.0f,
-        .waveform = WAVE_SINE,
-    };
-
     AppState app = {.synth = {
-                        .oscillator = osc,
+                        .oscillator =
+                            {
+                                .frequency = 440.0f,
+                                .sample_rate = SAMPLE_RATE,
+                                .phase = 0.0f,
+                                .waveform = WAVE_SINE,
+                            },
                         .envelope =
                             {
                                 .level = 0.0f,
@@ -134,9 +96,11 @@ int main()
 
     if (midi_result < 0)
     {
-        fprintf(stderr, "Failed to open MIDI input: %s\n", snd_strerror(midi_result));
-        return 1;
+        fprintf(
+            stderr, "MIDI unavailable; using computer keyboard: %s\n", snd_strerror(midi_result));
     }
+
+    int midi_available = midi_result >= 0;
 
     InitWindow(800, 400, "Subosc Scope");
     SetTargetFPS(60);
@@ -169,34 +133,85 @@ int main()
 
     ScopeDisplay display = {0};
 
+    const int piano_keys[] = {
+        KEY_A, KEY_W, KEY_S, KEY_E, KEY_D, KEY_F, KEY_T, KEY_G, KEY_Y, KEY_H, KEY_U, KEY_J, KEY_K};
+
+    const int piano_key_count = sizeof(piano_keys) / sizeof(piano_keys[0]);
+    int octave_offset = 0;
+
+    int active_notes[13];
+
+    for (int n = 0; n < piano_key_count; n++)
+    {
+        active_notes[n] = -1;
+    }
+
     while (!WindowShouldClose())
     {
-        if (IsKeyPressed(KEY_A))
-            atomic_store(&app.pending_command, COMMAND_NOTE_C);
-
-        if (IsKeyPressed(KEY_S))
-            atomic_store(&app.pending_command, COMMAND_NOTE_E);
-
-        if (IsKeyPressed(KEY_D))
-            atomic_store(&app.pending_command, COMMAND_NOTE_G);
-
-        if (IsKeyPressed(KEY_R))
+        if (IsKeyPressed(KEY_BACKSPACE))
             atomic_store(&app.pending_command, COMMAND_NOTE_OFF);
 
-        MidiEvent event;
-
-        while ((midi_result = midi_input_next(&midi, &event)) == 1)
+        if (IsKeyPressed(KEY_F3))
         {
-            if (!event_queue_push(&app.events, event))
+            octave_offset = octave_offset <= -12 ? octave_offset : octave_offset - 12;
+        }
+
+        if (IsKeyPressed(KEY_F4))
+        {
+            octave_offset = octave_offset >= 12 ? octave_offset : octave_offset + 12;
+        }
+
+        for (int n = 0; n < piano_key_count; n++)
+        {
+            MidiEvent event = {
+                .note = 60 + n + octave_offset,
+                .velocity = 100,
+            };
+
+            if (IsKeyPressed(piano_keys[n]))
             {
-                fprintf(stderr, "MIDI event queue is full\n");
+                event.type = MIDI_NOTE_ON;
+                active_notes[n] = 60 + n + octave_offset;
+                event.note = active_notes[n];
+
+                if (!event_queue_push(&app.events, event))
+                {
+                    fprintf(stderr, "Keyboard event queue is full\n");
+                }
+            }
+
+            if (IsKeyReleased(piano_keys[n]) && active_notes[n] != -1)
+            {
+                event.type = MIDI_NOTE_OFF;
+                event.velocity = 0;
+                event.note = active_notes[n];
+                active_notes[n] = -1;
+
+                if (!event_queue_push(&app.events, event))
+                {
+                    fprintf(stderr, "Keyboard event queue is full\n");
+                }
             }
         }
 
-        if (midi_result < 0)
+        if (midi_available)
         {
-            fprintf(stderr, "MIDI read failed: %s\n", snd_strerror(midi_result));
-            break;
+            MidiEvent event;
+
+            while ((midi_result = midi_input_next(&midi, &event)) == 1)
+            {
+                if (!event_queue_push(&app.events, event))
+                {
+                    fprintf(stderr, "MIDI event queue is full\n");
+                }
+            }
+
+            if (midi_result < 0)
+            {
+                fprintf(stderr, "MIDI read failed: %s\n", snd_strerror(midi_result));
+
+                midi_available = 0;
+            }
         }
 
         scope_display_update(&display, &app.scope);

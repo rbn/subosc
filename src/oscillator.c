@@ -42,14 +42,11 @@ float oscillator_next(Oscillator *osc)
     switch (osc->waveform)
     {
     case WAVE_SINE:
-        oscillator_next_sine(osc);
-        return sinf(2.0f * PI * osc->phase);
+        return oscillator_next_sine(osc);
     case WAVE_SAW:
-        oscillator_next_saw(osc);
-        return 2.0f * osc->phase - 1.0f;
+        return oscillator_next_saw(osc);
     case WAVE_SQUARE:
-        oscillator_next_square(osc);
-        return osc->phase < 0.5f ? 1.0f : -1.0f;
+        return oscillator_next_square(osc);
     default:
         return 0.0f;
     }
