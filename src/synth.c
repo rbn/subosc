@@ -1,13 +1,23 @@
 #include "synth.h"
 #include "note.h"
+#include <math.h>
 
 void synth_render(Synth *synth, float *output, int num_frames)
 {
-    oscillator_render(&synth->oscillator, output, num_frames);
+    float glide_amount = 1.0f;
+
+    if (synth->glide_seconds > 0.0f)
+    {
+        glide_amount = 1.0f - expf(-1.0f / (synth->glide_seconds * synth->oscillator.sample_rate));
+    }
 
     for (int n = 0; n < num_frames; n++)
     {
-        output[n] *= envelope_next(&synth->envelope) * synth->gain;
+        synth->oscillator.frequency +=
+            (synth->target_frequency - synth->oscillator.frequency) * glide_amount;
+
+        output[n] =
+            oscillator_next(&synth->oscillator) * envelope_next(&synth->envelope) * synth->gain;
     }
 }
 
@@ -36,11 +46,18 @@ void synth_note_on(Synth *synth, int midi_note)
         return;
     }
 
+    int was_holding_note = synth->held_note_count > 0;
+
     synth_remove_held_note(synth, midi_note);
     synth->held_notes[synth->held_note_count++] = midi_note;
 
-    synth->oscillator.frequency = note_to_frequency(midi_note);
-    envelope_note_on(&synth->envelope);
+    synth->target_frequency = note_to_frequency(midi_note);
+
+    if (!was_holding_note)
+    {
+        synth->oscillator.frequency = synth->target_frequency;
+        envelope_note_on(&synth->envelope);
+    }
 }
 
 void synth_note_off(Synth *synth, int midi_note)
@@ -65,7 +82,7 @@ void synth_note_off(Synth *synth, int midi_note)
     {
         int previous_note = synth->held_notes[synth->held_note_count - 1];
 
-        synth->oscillator.frequency = note_to_frequency(previous_note);
+        synth->target_frequency = note_to_frequency(previous_note);
     }
 }
 

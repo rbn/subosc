@@ -84,6 +84,8 @@ int main()
                                 .state = ENV_IDLE,
                             },
                         .gain = OUTPUT_GAIN,
+                        .target_frequency = 440.0f,
+                        .glide_seconds = 0.2f,
                     }};
 
     event_queue_init(&app.events);

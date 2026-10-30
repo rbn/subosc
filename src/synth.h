@@ -11,6 +11,8 @@ typedef struct
     float gain;
     int held_notes[128];
     int held_note_count;
+    float target_frequency;
+    float glide_seconds;
 } Synth;
 
 void synth_render(Synth *synth, float *outut, int num_frames);
