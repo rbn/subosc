@@ -78,7 +78,9 @@ int main()
                         .envelope =
                             {
                                 .level = 0.0f,
-                                .attack_seconds = 2.0f,
+                                .attack_seconds = 0.1f,
+                                .decay_seconds = 0.5f,
+                                .sustain_level = 0.4f,
                                 .release_seconds = 1.0f,
                                 .sample_rate = SAMPLE_RATE,
                                 .state = ENV_IDLE,

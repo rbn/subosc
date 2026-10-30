@@ -4,3 +4,4 @@
 - TOOD: remove wav files from git/github (git rm --cached)
 - TODO: add an oscilliscope (nice to have)
 - check out ring buffer - make sure you understand it (event_queue.c -- "%")
+- make sure to do a malloc/free
