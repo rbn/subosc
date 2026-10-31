@@ -1,5 +1,6 @@
 #include "envelope.h"
 #include "file_io.h"
+#include "filter.h"
 #include "midi.h"
 #include "oscillator.h"
 #include <stdio.h>
@@ -73,7 +74,7 @@ int main()
                                 .frequency = 440.0f,
                                 .sample_rate = SAMPLE_RATE,
                                 .phase = 0.0f,
-                                .waveform = WAVE_SINE,
+                                .waveform = WAVE_SAW,
                             },
                         .envelope =
                             {
@@ -90,6 +91,7 @@ int main()
                         .glide_seconds = 0.2f,
                     }};
 
+    filter_init(&app.synth.filter, SAMPLE_RATE, 500.0f);
     event_queue_init(&app.events);
 
     atomic_init(&app.pending_command, COMMAND_NONE);

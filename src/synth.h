@@ -3,6 +3,7 @@
 
 #include "oscillator.h"
 #include "envelope.h"
+#include "filter.h"
 
 typedef struct
 {
@@ -13,6 +14,7 @@ typedef struct
     int held_note_count;
     float target_frequency;
     float glide_seconds;
+    LowPassFilter filter;
 } Synth;
 
 void synth_render(Synth *synth, float *outut, int num_frames);
