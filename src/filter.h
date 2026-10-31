@@ -11,5 +11,6 @@ typedef struct
 
 void filter_init(LowPassFilter *filter, float sample_rate, float cutoff_hz);
 float filter_next(LowPassFilter *filter, float input);
+void filter_set_cutoff(LowPassFilter *filter, float cutoff_hz);
 
 #endif
