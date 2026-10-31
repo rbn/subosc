@@ -8,7 +8,8 @@ c_files := \
 	src/scope.c \
 	src/note.c \
 	src/midi.c \
-	src/event_queue.c
+	src/event_queue.c \
+	src/filter.c
 
 h_files := \
 	src/oscillator.h \
@@ -18,7 +19,8 @@ h_files := \
 	src/scope.h \
 	src/note.h \
 	src/midi.h \
-	src/event_queue.h
+	src/event_queue.h \
+	src/filter.h
 
 
 CC = gcc

@@ -1,5 +1,6 @@
 #include "synth.h"
 #include "note.h"
+#include "oscillator.h"
 #include <math.h>
 
 void synth_render(Synth *synth, float *output, int num_frames)
@@ -16,8 +17,10 @@ void synth_render(Synth *synth, float *output, int num_frames)
         synth->oscillator.frequency +=
             (synth->target_frequency - synth->oscillator.frequency) * glide_amount;
 
-        output[n] =
-            oscillator_next(&synth->oscillator) * envelope_next(&synth->envelope) * synth->gain;
+        float sample = oscillator_next(&synth->oscillator);
+        float filtered = filter_next(&synth->filter, sample);
+
+        output[n] = filtered * envelope_next(&synth->envelope) * synth->gain;
     }
 }
 

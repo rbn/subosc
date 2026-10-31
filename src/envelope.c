@@ -1,6 +1,7 @@
 #include "envelope.h"
 
 void envelope_note_on(Envelope *env) { env->state = ENV_ATTACK; }
+
 void envelope_note_off(Envelope *env)
 {
     if (env->state == ENV_RELEASE || env->state == ENV_IDLE)
