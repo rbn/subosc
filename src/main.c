@@ -28,6 +28,7 @@ typedef struct
     atomic_int pending_command;
     ScopeCapture scope;
     EventQueue events;
+    atomic_int requested_cutoff_hz;
 } AppState;
 
 static void audio_callback(ma_device *device,
@@ -62,6 +63,13 @@ static void audio_callback(ma_device *device,
         }
     }
 
+    int requested_cutoff = atomic_load(&app->requested_cutoff_hz);
+
+    if ((float)requested_cutoff != app->synth.filter.cutoff_hz)
+    {
+        filter_set_cutoff(&app->synth.filter, (float)requested_cutoff);
+    }
+
     synth_render(&app->synth, output, (int)frame_count);
     scope_capture_push(&app->scope, output, (int)frame_count);
 }
@@ -91,12 +99,14 @@ int main()
                         .glide_seconds = 0.2f,
                     }};
 
-    filter_init(&app.synth.filter, SAMPLE_RATE, 500.0f);
+    filter_init(&app.synth.filter, SAMPLE_RATE, 1000.0f);
+    atomic_init(&app.requested_cutoff_hz, 1000);
     event_queue_init(&app.events);
 
     atomic_init(&app.pending_command, COMMAND_NONE);
     scope_capture_init(&app.scope);
 
+    // midi controller setup (Arturia KeyStep)
     MidiInput midi;
     int midi_result = midi_input_open(&midi, "hw:0,0,0");
 
@@ -108,9 +118,11 @@ int main()
 
     int midi_available = midi_result >= 0;
 
+    // oscilliscope visual
     InitWindow(800, 400, "Subosc Scope");
     SetTargetFPS(60);
 
+    // miniaudio device and config
     ma_device_config config = ma_device_config_init(ma_device_type_playback);
     config.playback.format = ma_format_f32;
     config.playback.channels = 1;
@@ -152,6 +164,8 @@ int main()
         active_notes[n] = -1;
     }
 
+    int cutoff_hz = 1000;
+
     while (!WindowShouldClose())
     {
         if (IsKeyPressed(KEY_BACKSPACE))
@@ -166,6 +180,29 @@ int main()
         {
             octave_offset = octave_offset >= 12 ? octave_offset : octave_offset + 12;
         }
+
+        // filter controls
+        if (IsKeyPressed(KEY_LEFT))
+        {
+            cutoff_hz = cutoff_hz * 4 / 5;
+        }
+
+        if (IsKeyPressed(KEY_RIGHT))
+        {
+            cutoff_hz = cutoff_hz * 5 / 4;
+        }
+
+        if (cutoff_hz < 20)
+        {
+            cutoff_hz = 20;
+        }
+
+        if (cutoff_hz > 20000)
+        {
+            cutoff_hz = 20000;
+        }
+
+        atomic_store(&app.requested_cutoff_hz, cutoff_hz);
 
         for (int n = 0; n < piano_key_count; n++)
         {
@@ -225,6 +262,7 @@ int main()
         BeginDrawing();
         ClearBackground(BLACK);
         scope_display_draw(&display);
+        DrawText(TextFormat("cutoff %d Hz Left/Right", cutoff_hz), 420, 15, 16, WHITE);
         EndDrawing();
     }
     ma_device_uninit(&device);
