@@ -29,6 +29,7 @@ typedef struct
     ScopeCapture scope;
     EventQueue events;
     atomic_int requested_cutoff_hz;
+    atomic_int requested_resonance_q100;
 } AppState;
 
 static void audio_callback(ma_device *device,
@@ -70,6 +71,15 @@ static void audio_callback(ma_device *device,
         filter_set_cutoff(&app->synth.filter, (float)requested_cutoff);
     }
 
+    int requested_q100 = atomic_load(&app->requested_resonance_q100);
+
+    float requested_q = requested_q100 / 100.0f;
+
+    if (requested_q != app->synth.filter.resonance_q)
+    {
+        filter_set_resonance(&app->synth.filter, requested_q);
+    }
+
     synth_render(&app->synth, output, (int)frame_count);
     scope_capture_push(&app->scope, output, (int)frame_count);
 }
@@ -87,7 +97,7 @@ int main()
                         .envelope =
                             {
                                 .level = 0.0f,
-                                .attack_seconds = 0.1f,
+                                .attack_seconds = 0.0f,
                                 .decay_seconds = 0.5f,
                                 .sustain_level = 0.4f,
                                 .release_seconds = 1.0f,
@@ -99,8 +109,13 @@ int main()
                         .glide_seconds = 0.2f,
                     }};
 
+    // initializations
     filter_init(&app.synth.filter, SAMPLE_RATE, 1000.0f);
+    filter_set_resonance(&app.synth.filter, 2.0f);
     atomic_init(&app.requested_cutoff_hz, 1000);
+
+    // Q value -- 200 means Q = 2.0
+    atomic_init(&app.requested_resonance_q100, 200);
     event_queue_init(&app.events);
 
     atomic_init(&app.pending_command, COMMAND_NONE);
@@ -165,6 +180,7 @@ int main()
     }
 
     int cutoff_hz = 1000;
+    int resonance_q100 = 200;
 
     while (!WindowShouldClose())
     {
@@ -202,6 +218,27 @@ int main()
             cutoff_hz = 20000;
         }
 
+        if (IsKeyPressed(KEY_DOWN))
+        {
+            resonance_q100 -= 10;
+        }
+
+        if (IsKeyPressed(KEY_UP))
+        {
+            resonance_q100 += 10;
+        }
+
+        if (resonance_q100 < 50)
+        {
+            resonance_q100 = 50;
+        }
+
+        if (resonance_q100 > 500)
+        {
+            resonance_q100 = 500;
+        }
+
+        atomic_store(&app.requested_resonance_q100, resonance_q100);
         atomic_store(&app.requested_cutoff_hz, cutoff_hz);
 
         for (int n = 0; n < piano_key_count; n++)
@@ -259,10 +296,13 @@ int main()
 
         scope_display_update(&display, &app.scope);
 
+        // drawing
         BeginDrawing();
         ClearBackground(BLACK);
         scope_display_draw(&display);
-        DrawText(TextFormat("cutoff %d Hz Left/Right", cutoff_hz), 420, 15, 16, WHITE);
+        DrawText(TextFormat("Cutoff: %d Hz  Left/Right", cutoff_hz), 390, 10, 14, WHITE);
+        DrawText(
+            TextFormat("Resonance Q: %.2f  Up/Down", resonance_q100 / 100.0f), 390, 28, 14, WHITE);
         EndDrawing();
     }
     ma_device_uninit(&device);
