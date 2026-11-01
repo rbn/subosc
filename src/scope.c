@@ -1,5 +1,6 @@
 #include "scope.h"
 #include "raylib.h"
+#include <math.h>
 
 void scope_capture_init(ScopeCapture *capture)
 {
@@ -43,15 +44,51 @@ void scope_display_update(ScopeDisplay *display, ScopeCapture *capture)
     capture->count = 0;
     atomic_store(&capture->ready, 0);
 
-    int start = 0;
+    float peak = 0.0f;
+
+    for (int n = 0; n < SCOPE_CAPTURE_SAMPLES; n++)
+    {
+        float amplitude = fabsf(captured_samples[n]);
+
+        if (amplitude > peak)
+        {
+            peak = amplitude;
+        }
+    }
+
+    /* Clear the display when effectively silent. */
+    if (peak < 0.0001f)
+    {
+        for (int n = 0; n < SCOPE_SAMPLES; n++)
+        {
+            display->samples[n] = 0.0f;
+        }
+
+        return;
+    }
+
+    float threshold = peak * 0.25f;
+    int armed = 0;
+    int start = -1;
 
     for (int n = 1; n <= SCOPE_SAMPLES; n++)
     {
-        if (captured_samples[n - 1] <= 0.0f && captured_samples[n] > 0.0f)
+        if (captured_samples[n - 1] < -threshold)
+        {
+            armed = 1;
+        }
+
+        if (armed && captured_samples[n - 1] <= 0.0f && captured_samples[n] > 0.0f)
         {
             start = n;
             break;
         }
+    }
+
+    /* Keep the previous picture if no suitable trigger was found. */
+    if (start == -1)
+    {
+        return;
     }
 
     for (int n = 0; n < SCOPE_SAMPLES; n++)

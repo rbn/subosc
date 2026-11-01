@@ -30,6 +30,10 @@ typedef struct
     EventQueue events;
     atomic_int requested_cutoff_hz;
     atomic_int requested_resonance_q100;
+    atomic_int requested_attack_ms;
+    atomic_int requested_decay_ms;
+    atomic_int requested_sustain_percent;
+    atomic_int requested_release_ms;
 } AppState;
 
 static void audio_callback(ma_device *device,
@@ -40,6 +44,12 @@ static void audio_callback(ma_device *device,
     AppState *app = device->pUserData;
 
     (void)input; // ignore this parameter - MA says we need it, we dont use it right now
+
+    // convert milliseconds to seconds / sustain percentage to level bet. 0.0f and 1.0f
+    app->synth.envelope.attack_seconds = atomic_load(&app->requested_attack_ms) / 1000.0f;
+    app->synth.envelope.decay_seconds = atomic_load(&app->requested_decay_ms) / 1000.0f;
+    app->synth.envelope.sustain_level = atomic_load(&app->requested_sustain_percent) / 100.0f;
+    app->synth.envelope.release_seconds = atomic_load(&app->requested_release_ms) / 1000.0f;
 
     int command = atomic_exchange(&app->pending_command, COMMAND_NONE);
 
@@ -118,6 +128,11 @@ int main()
     atomic_init(&app.requested_resonance_q100, 200);
     event_queue_init(&app.events);
 
+    atomic_init(&app.requested_attack_ms, 100);
+    atomic_init(&app.requested_decay_ms, 500);
+    atomic_init(&app.requested_sustain_percent, 40);
+    atomic_init(&app.requested_release_ms, 1000);
+
     atomic_init(&app.pending_command, COMMAND_NONE);
     scope_capture_init(&app.scope);
 
@@ -134,7 +149,7 @@ int main()
     int midi_available = midi_result >= 0;
 
     // oscilliscope visual
-    InitWindow(800, 400, "Subosc Scope");
+    InitWindow(800, 480, "Subosc Scope");
     SetTargetFPS(60);
 
     // miniaudio device and config
@@ -181,6 +196,10 @@ int main()
 
     int cutoff_hz = 1000;
     int resonance_q100 = 200;
+    int attack_ms = 100;
+    int decay_ms = 500;
+    int sustain_percent = 40;
+    int release_ms = 1000;
 
     while (!WindowShouldClose())
     {
@@ -208,6 +227,7 @@ int main()
             cutoff_hz = cutoff_hz * 5 / 4;
         }
 
+        // cutoff
         if (cutoff_hz < 20)
         {
             cutoff_hz = 20;
@@ -218,6 +238,7 @@ int main()
             cutoff_hz = 20000;
         }
 
+        // resonance
         if (IsKeyPressed(KEY_DOWN))
         {
             resonance_q100 -= 10;
@@ -238,8 +259,96 @@ int main()
             resonance_q100 = 500;
         }
 
+        // attack
+        if (IsKeyPressed(KEY_ONE))
+        {
+            attack_ms -= 50;
+        }
+
+        if (IsKeyPressed(KEY_TWO))
+        {
+            attack_ms += 50;
+        }
+
+        if (attack_ms < 0)
+        {
+            attack_ms = 0;
+        }
+
+        if (attack_ms > 5000)
+        {
+            attack_ms = 5000;
+        }
+
+        // decay
+        if (IsKeyPressed(KEY_THREE))
+        {
+            decay_ms -= 50;
+        }
+
+        if (IsKeyPressed(KEY_FOUR))
+        {
+            decay_ms += 50;
+        }
+
+        if (decay_ms < 0)
+        {
+            decay_ms = 0;
+        }
+
+        if (decay_ms > 5000)
+        {
+            decay_ms = 5000;
+        }
+
+        // sustain
+        if (IsKeyPressed(KEY_FIVE))
+        {
+            sustain_percent -= 5;
+        }
+
+        if (IsKeyPressed(KEY_SIX))
+        {
+            sustain_percent += 5;
+        }
+
+        if (sustain_percent < 0)
+        {
+            sustain_percent = 0;
+        }
+
+        if (sustain_percent > 100)
+        {
+            sustain_percent = 100;
+        }
+
+        // release
+        if (IsKeyPressed(KEY_SEVEN))
+        {
+            release_ms -= 50;
+        }
+
+        if (IsKeyPressed(KEY_EIGHT))
+        {
+            release_ms += 50;
+        }
+
+        if (release_ms < 0)
+        {
+            release_ms = 0;
+        }
+
+        if (release_ms > 5000)
+        {
+            release_ms = 5000;
+        }
+
         atomic_store(&app.requested_resonance_q100, resonance_q100);
         atomic_store(&app.requested_cutoff_hz, cutoff_hz);
+        atomic_store(&app.requested_attack_ms, attack_ms);
+        atomic_store(&app.requested_decay_ms, decay_ms);
+        atomic_store(&app.requested_sustain_percent, sustain_percent);
+        atomic_store(&app.requested_release_ms, release_ms);
 
         for (int n = 0; n < piano_key_count; n++)
         {
@@ -303,6 +412,10 @@ int main()
         DrawText(TextFormat("Cutoff: %d Hz  Left/Right", cutoff_hz), 390, 10, 14, WHITE);
         DrawText(
             TextFormat("Resonance Q: %.2f  Up/Down", resonance_q100 / 100.0f), 390, 28, 14, WHITE);
+        DrawText(TextFormat("Attack: %d ms 1/2", attack_ms), 70, 410, 16, WHITE);
+        DrawText(TextFormat("Decay: %d ms 3/4", decay_ms), 410, 410, 16, WHITE);
+        DrawText(TextFormat("Sustain: %d ms 5/6", sustain_percent), 70, 440, 16, WHITE);
+        DrawText(TextFormat("Release: %d ms  7/8", release_ms), 410, 440, 16, WHITE);
         EndDrawing();
     }
     ma_device_uninit(&device);
