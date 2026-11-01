@@ -5,7 +5,8 @@ typedef enum
 {
     WAVE_SINE,
     WAVE_SAW,
-    WAVE_SQUARE
+    WAVE_SQUARE,
+    WAVE_COUNT
 } Waveform;
 
 typedef struct
@@ -18,5 +19,7 @@ typedef struct
 
 float oscillator_next(Oscillator *osc);
 void oscillator_render(Oscillator *osc, float *output, int num_frames);
+Waveform oscillator_cycle_waveform(Waveform wf);
+const char *oscillator_get_wave_desc(Waveform wf);
 
 #endif

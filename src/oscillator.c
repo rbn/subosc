@@ -59,3 +59,27 @@ void oscillator_render(Oscillator *osc, float *output, int num_frames)
         output[n] = oscillator_next(osc);
     }
 }
+
+Waveform oscillator_cycle_waveform(Waveform wf)
+{
+    Waveform next;
+
+    next = (wf + 1) % WAVE_COUNT;
+
+    return next;
+}
+
+const char *oscillator_get_wave_desc(Waveform wf)
+{
+    switch (wf)
+    {
+    case WAVE_SINE:
+        return "Sine";
+    case WAVE_SAW:
+        return "Saw";
+    case WAVE_SQUARE:
+        return "Square";
+    default:
+        return "Unknown";
+    }
+}

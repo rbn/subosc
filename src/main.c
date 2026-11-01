@@ -34,6 +34,7 @@ typedef struct
     atomic_int requested_decay_ms;
     atomic_int requested_sustain_percent;
     atomic_int requested_release_ms;
+    atomic_int requested_waveform;
 } AppState;
 
 static void audio_callback(ma_device *device,
@@ -90,6 +91,8 @@ static void audio_callback(ma_device *device,
         filter_set_resonance(&app->synth.filter, requested_q);
     }
 
+    app->synth.oscillator.waveform = atomic_load(&app->requested_waveform);
+
     synth_render(&app->synth, output, (int)frame_count);
     scope_capture_push(&app->scope, output, (int)frame_count);
 }
@@ -123,6 +126,7 @@ int main()
     filter_init(&app.synth.filter, SAMPLE_RATE, 1000.0f);
     filter_set_resonance(&app.synth.filter, 2.0f);
     atomic_init(&app.requested_cutoff_hz, 1000);
+    atomic_init(&app.requested_waveform, WAVE_SAW);
 
     // Q value -- 200 means Q = 2.0
     atomic_init(&app.requested_resonance_q100, 200);
@@ -200,12 +204,21 @@ int main()
     int decay_ms = 500;
     int sustain_percent = 40;
     int release_ms = 1000;
+    Waveform waveform = WAVE_SAW;
 
     while (!WindowShouldClose())
     {
         if (IsKeyPressed(KEY_BACKSPACE))
             atomic_store(&app.pending_command, COMMAND_NOTE_OFF);
 
+        // waveform
+        if (IsKeyPressed(KEY_F1))
+        {
+            waveform = oscillator_cycle_waveform(app.synth.oscillator.waveform);
+            atomic_store(&app.requested_waveform, waveform);
+        }
+
+        // octave
         if (IsKeyPressed(KEY_F3))
         {
             octave_offset = octave_offset <= -12 ? octave_offset : octave_offset - 12;
@@ -409,12 +422,17 @@ int main()
         BeginDrawing();
         ClearBackground(BLACK);
         scope_display_draw(&display);
+        DrawText(TextFormat("Wave format: %s  F1", oscillator_get_wave_desc(waveform)),
+                 141,
+                 10,
+                 14,
+                 WHITE);
         DrawText(TextFormat("Cutoff: %d Hz  Left/Right", cutoff_hz), 390, 10, 14, WHITE);
         DrawText(
             TextFormat("Resonance Q: %.2f  Up/Down", resonance_q100 / 100.0f), 390, 28, 14, WHITE);
         DrawText(TextFormat("Attack: %d ms 1/2", attack_ms), 70, 410, 16, WHITE);
         DrawText(TextFormat("Decay: %d ms 3/4", decay_ms), 410, 410, 16, WHITE);
-        DrawText(TextFormat("Sustain: %d ms 5/6", sustain_percent), 70, 440, 16, WHITE);
+        DrawText(TextFormat("Sustain: %d%% ms 5/6", sustain_percent), 70, 440, 16, WHITE);
         DrawText(TextFormat("Release: %d ms  7/8", release_ms), 410, 440, 16, WHITE);
         EndDrawing();
     }
