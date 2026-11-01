@@ -106,6 +106,7 @@ int main()
     atomic_init(&app.pending_command, COMMAND_NONE);
     scope_capture_init(&app.scope);
 
+    // midi controller setup (Arturia KeyStep)
     MidiInput midi;
     int midi_result = midi_input_open(&midi, "hw:0,0,0");
 
@@ -117,9 +118,11 @@ int main()
 
     int midi_available = midi_result >= 0;
 
+    // oscilliscope visual
     InitWindow(800, 400, "Subosc Scope");
     SetTargetFPS(60);
 
+    // miniaudio device and config
     ma_device_config config = ma_device_config_init(ma_device_type_playback);
     config.playback.format = ma_format_f32;
     config.playback.channels = 1;

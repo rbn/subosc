@@ -6,6 +6,7 @@ void event_queue_init(EventQueue *queue)
     atomic_init(&queue->write_index, 0);
 }
 
+// 1 == success, 0 == full (next != read_index)
 int event_queue_push(EventQueue *queue, MidiEvent event)
 {
     int write = atomic_load(&queue->write_index);
