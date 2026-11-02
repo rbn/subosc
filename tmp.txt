@@ -1,0 +1,41 @@
+I’d buy the Pi foundation now, with a simple path to twelve knobs. Here’s the list I’d use:
+Part	Recommendation	Budget
+Computer	Pi 4 Model B, 2GB	$55–68*
+Power	Official 15W USB-C supply, US plug	$8.80
+Storage	Name-brand 32GB microSD, plus reader if needed	Allow $8–12
+Headphones	Basic USB audio adapter with headphone output	$4.95
+Protection/cooling	Simple case with GPIO access and a heatsink	Allow $8–12
+
+
+The board listings currently disagree on price, so check the basket before ordering. The supply and audio adapter prices are listed above. SC0193
+
+That puts the foundation around $85–106 before shipping and tax. My earlier under-$100 estimate is tight at these prices.
+
+For the controls, I recommend potentiometers plus two MCP3008 ADC chips. Each chip provides eight inputs; together, that gives us sixteen knob inputs. They’re breadboard-friendly and listed at $4.50 each. We can install one initially and add the second when needed. adafruit.com
+
+The first control experiment would need:
+- One MCP3008.
+- Two 10kΩ linear potentiometers, suitable for breadboard prototyping.
+- A solderless breadboard and male-to-male/male-to-female jumper wires.
+I’d postpone the final enclosure and all twelve panel knobs. Prototype pots are convenient for learning; panel-mounted pots need matching shafts, knob caps, mounting holes, and wiring. Choosing those together will save frustration.
+
+We can set up the Pi over Wi-Fi and SSH, so a monitor and HDMI cable aren’t required. The first purchase gets your Arturia playing the standalone engine; the two-knob experiment follows.
+
+
+====================
+
+
+Next, I’d tackle stuck-note protection when the window loses focus. If you release a key while another window is active, our app may miss it. We’ll make it release all notes when you switch away—a useful reliability step before hardware.
+
+
+
+Let’s use these specs:
+- Detect when the window changes from focused to unfocused. Raylib’s IsWindowFocused() tells you its current state.
+- On that transition, request all notes off through our existing atomic command.
+- Reset the keyboard’s active_notes entries to -1.
+- While unfocused, don’t generate computer-keyboard note events.
+- On returning, require a fresh keypress to play again.
+- Keep processing external MIDI normally. For this first version, losing focus releases all sounding notes, including MIDI notes; new MIDI events can still play afterward.
+Test: hold a keyboard note, switch to another window, release the key, then return. The note should release using its envelope, and the keyboard should play normally afterward.
+
+Start with where you’d keep the previous focus state and where you’d check for the transition.

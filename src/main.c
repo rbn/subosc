@@ -10,6 +10,7 @@
 #include <raylib.h>
 #include "scope.h"
 #include "event_queue.h"
+#include <getopt.h>
 
 #define SAMPLE_RATE 48000
 #define NUM_SAMPLES 48000
@@ -97,8 +98,35 @@ static void audio_callback(ma_device *device,
     scope_capture_push(&app->scope, output, (int)frame_count);
 }
 
-int main()
+int main(int argc, char *argv[])
 {
+    int opt;
+    int headless = 0;
+
+    struct option long_options[] = {
+        {"headless", no_argument, 0, 'h'},
+        {0, 0, 0, 0},
+    };
+
+    while ((opt = getopt_long(argc, argv, "v:", long_options, NULL)) != -1)
+    {
+        switch (opt)
+        {
+        case 'h':
+            headless = 1;
+            printf("headless!!\n");
+            break;
+        default:
+            headless = 0;
+            break;
+        }
+    }
+
+    if (headless)
+    {
+    }
+    return 0;
+
     AppState app = {.synth = {
                         .oscillator =
                             {
