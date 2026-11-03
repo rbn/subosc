@@ -11,6 +11,8 @@
 #include "scope.h"
 #include "event_queue.h"
 #include <getopt.h>
+#include <signal.h>
+#include <time.h>
 
 #define SAMPLE_RATE 48000
 #define NUM_SAMPLES 48000
@@ -36,6 +38,7 @@ typedef struct
     atomic_int requested_sustain_percent;
     atomic_int requested_release_ms;
     atomic_int requested_waveform;
+    int scope_enabled;
 } AppState;
 
 static void audio_callback(ma_device *device,
@@ -45,7 +48,7 @@ static void audio_callback(ma_device *device,
 {
     AppState *app = device->pUserData;
 
-    (void)input; // ignore this parameter - MA says we need it, we dont use it right now
+    (void)input;
 
     // convert milliseconds to seconds / sustain percentage to level bet. 0.0f and 1.0f
     app->synth.envelope.attack_seconds = atomic_load(&app->requested_attack_ms) / 1000.0f;
@@ -95,11 +98,28 @@ static void audio_callback(ma_device *device,
     app->synth.oscillator.waveform = atomic_load(&app->requested_waveform);
 
     synth_render(&app->synth, output, (int)frame_count);
-    scope_capture_push(&app->scope, output, (int)frame_count);
+
+    if (app->scope_enabled)
+        scope_capture_push(&app->scope, output, (int)frame_count);
 }
+
+static volatile sig_atomic_t stop_requested = 0;
+
+static void handle_shutdown(int signal_number)
+{
+    (void)signal_number;
+    stop_requested = 1;
+}
+
+/*
+ *  (put description)
+ *
+ */
 
 int main(int argc, char *argv[])
 {
+    // Parse command line options
+
     int opt;
     int headless = 0;
 
@@ -108,24 +128,26 @@ int main(int argc, char *argv[])
         {0, 0, 0, 0},
     };
 
-    while ((opt = getopt_long(argc, argv, "v:", long_options, NULL)) != -1)
+    while ((opt = getopt_long(argc, argv, "", long_options, NULL)) != -1)
     {
         switch (opt)
         {
         case 'h':
             headless = 1;
-            printf("headless!!\n");
             break;
         default:
-            headless = 0;
-            break;
+            fprintf(stderr, "Usage: %s [--headless]\n", argv[0]);
+            return 1;
         }
     }
 
-    if (headless)
+    if (optind < argc)
     {
+        fprintf(stderr, "Unexpected argument: %s\n", argv[optind]);
+        fprintf(stderr, "Usage: %s [--headless]\n", argv[0]);
+        return 1;
     }
-    return 0;
+    // Initialize synth and shared state
 
     AppState app = {.synth = {
                         .oscillator =
@@ -150,39 +172,40 @@ int main(int argc, char *argv[])
                         .glide_seconds = 0.2f,
                     }};
 
-    // initializations
     filter_init(&app.synth.filter, SAMPLE_RATE, 1000.0f);
     filter_set_resonance(&app.synth.filter, 2.0f);
     atomic_init(&app.requested_cutoff_hz, 1000);
     atomic_init(&app.requested_waveform, WAVE_SAW);
-
-    // Q value -- 200 means Q = 2.0
-    atomic_init(&app.requested_resonance_q100, 200);
-    event_queue_init(&app.events);
-
+    atomic_init(&app.requested_resonance_q100, 200); // Q value -- 200 means Q = 2.0
     atomic_init(&app.requested_attack_ms, 100);
     atomic_init(&app.requested_decay_ms, 500);
     atomic_init(&app.requested_sustain_percent, 40);
     atomic_init(&app.requested_release_ms, 1000);
 
     atomic_init(&app.pending_command, COMMAND_NONE);
-    scope_capture_init(&app.scope);
+    event_queue_init(&app.events);
+
+    app.scope_enabled = !headless;
+
+    if (!headless)
+        scope_capture_init(&app.scope);
 
     // midi controller setup (Arturia KeyStep)
     MidiInput midi;
     int midi_result = midi_input_open(&midi, "hw:0,0,0");
 
     if (midi_result < 0)
-    {
         fprintf(
             stderr, "MIDI unavailable; using computer keyboard: %s\n", snd_strerror(midi_result));
-    }
 
     int midi_available = midi_result >= 0;
 
     // oscilliscope visual
-    InitWindow(800, 480, "Subosc Scope");
-    SetTargetFPS(60);
+    if (!headless)
+    {
+        InitWindow(800, 480, "Subosc Scope");
+        SetTargetFPS(60);
+    }
 
     // miniaudio device and config
     ma_device_config config = ma_device_config_init(ma_device_type_playback);
@@ -192,12 +215,20 @@ int main(int argc, char *argv[])
     config.dataCallback = audio_callback;
     config.pUserData = &app;
 
+    // handle interrupt (Ctrl+C etc)
+    if (signal(SIGINT, handle_shutdown) == SIG_ERR)
+    {
+        fprintf(stderr, "failed to register signal handler\n");
+        return 1;
+    }
+
     ma_device device;
 
     if (ma_device_init(NULL, &config, &device) != MA_SUCCESS)
     {
         fprintf(stderr, "Failed to initialize audio device\n");
-        CloseWindow();
+        if (!headless)
+            CloseWindow();
         midi_input_close(&midi);
         return 1;
     }
@@ -206,7 +237,8 @@ int main(int argc, char *argv[])
     {
         fprintf(stderr, "Failied to start audio device\n");
         ma_device_uninit(&device);
-        CloseWindow();
+        if (!headless)
+            CloseWindow();
         midi_input_close(&midi);
         return 1;
     }
@@ -234,196 +266,201 @@ int main(int argc, char *argv[])
     int release_ms = 1000;
     Waveform waveform = WAVE_SAW;
 
-    while (!WindowShouldClose())
+    while (!stop_requested)
     {
-        if (IsKeyPressed(KEY_BACKSPACE))
-            atomic_store(&app.pending_command, COMMAND_NOTE_OFF);
+        if (!headless && WindowShouldClose())
+            break;
 
-        // waveform
-        if (IsKeyPressed(KEY_F1))
+        if (!headless)
         {
-            waveform = oscillator_cycle_waveform(app.synth.oscillator.waveform);
-            atomic_store(&app.requested_waveform, waveform);
-        }
+            if (IsKeyPressed(KEY_BACKSPACE))
+                atomic_store(&app.pending_command, COMMAND_NOTE_OFF);
 
-        // octave
-        if (IsKeyPressed(KEY_F3))
-        {
-            octave_offset = octave_offset <= -12 ? octave_offset : octave_offset - 12;
-        }
-
-        if (IsKeyPressed(KEY_F4))
-        {
-            octave_offset = octave_offset >= 12 ? octave_offset : octave_offset + 12;
-        }
-
-        // filter controls
-        if (IsKeyPressed(KEY_LEFT))
-        {
-            cutoff_hz = cutoff_hz * 4 / 5;
-        }
-
-        if (IsKeyPressed(KEY_RIGHT))
-        {
-            cutoff_hz = cutoff_hz * 5 / 4;
-        }
-
-        // cutoff
-        if (cutoff_hz < 20)
-        {
-            cutoff_hz = 20;
-        }
-
-        if (cutoff_hz > 20000)
-        {
-            cutoff_hz = 20000;
-        }
-
-        // resonance
-        if (IsKeyPressed(KEY_DOWN))
-        {
-            resonance_q100 -= 10;
-        }
-
-        if (IsKeyPressed(KEY_UP))
-        {
-            resonance_q100 += 10;
-        }
-
-        if (resonance_q100 < 50)
-        {
-            resonance_q100 = 50;
-        }
-
-        if (resonance_q100 > 500)
-        {
-            resonance_q100 = 500;
-        }
-
-        // attack
-        if (IsKeyPressed(KEY_ONE))
-        {
-            attack_ms -= 50;
-        }
-
-        if (IsKeyPressed(KEY_TWO))
-        {
-            attack_ms += 50;
-        }
-
-        if (attack_ms < 0)
-        {
-            attack_ms = 0;
-        }
-
-        if (attack_ms > 5000)
-        {
-            attack_ms = 5000;
-        }
-
-        // decay
-        if (IsKeyPressed(KEY_THREE))
-        {
-            decay_ms -= 50;
-        }
-
-        if (IsKeyPressed(KEY_FOUR))
-        {
-            decay_ms += 50;
-        }
-
-        if (decay_ms < 0)
-        {
-            decay_ms = 0;
-        }
-
-        if (decay_ms > 5000)
-        {
-            decay_ms = 5000;
-        }
-
-        // sustain
-        if (IsKeyPressed(KEY_FIVE))
-        {
-            sustain_percent -= 5;
-        }
-
-        if (IsKeyPressed(KEY_SIX))
-        {
-            sustain_percent += 5;
-        }
-
-        if (sustain_percent < 0)
-        {
-            sustain_percent = 0;
-        }
-
-        if (sustain_percent > 100)
-        {
-            sustain_percent = 100;
-        }
-
-        // release
-        if (IsKeyPressed(KEY_SEVEN))
-        {
-            release_ms -= 50;
-        }
-
-        if (IsKeyPressed(KEY_EIGHT))
-        {
-            release_ms += 50;
-        }
-
-        if (release_ms < 0)
-        {
-            release_ms = 0;
-        }
-
-        if (release_ms > 5000)
-        {
-            release_ms = 5000;
-        }
-
-        atomic_store(&app.requested_resonance_q100, resonance_q100);
-        atomic_store(&app.requested_cutoff_hz, cutoff_hz);
-        atomic_store(&app.requested_attack_ms, attack_ms);
-        atomic_store(&app.requested_decay_ms, decay_ms);
-        atomic_store(&app.requested_sustain_percent, sustain_percent);
-        atomic_store(&app.requested_release_ms, release_ms);
-
-        for (int n = 0; n < piano_key_count; n++)
-        {
-            MidiEvent event = {
-                .note = 60 + n + octave_offset,
-                .velocity = 100,
-            };
-
-            if (IsKeyPressed(piano_keys[n]))
+            // waveform
+            if (IsKeyPressed(KEY_F1))
             {
-                event.type = MIDI_NOTE_ON;
-                active_notes[n] = 60 + n + octave_offset;
-                event.note = active_notes[n];
-
-                if (!event_queue_push(&app.events, event))
-                {
-                    fprintf(stderr, "Keyboard event queue is full\n");
-                }
+                waveform = oscillator_cycle_waveform(waveform);
+                atomic_store(&app.requested_waveform, waveform);
             }
 
-            if (IsKeyReleased(piano_keys[n]) && active_notes[n] != -1)
+            // octave
+            if (IsKeyPressed(KEY_F3))
             {
-                event.type = MIDI_NOTE_OFF;
-                event.velocity = 0;
-                event.note = active_notes[n];
-                active_notes[n] = -1;
+                octave_offset = octave_offset <= -12 ? octave_offset : octave_offset - 12;
+            }
 
-                if (!event_queue_push(&app.events, event))
+            if (IsKeyPressed(KEY_F4))
+            {
+                octave_offset = octave_offset >= 12 ? octave_offset : octave_offset + 12;
+            }
+
+            // filter controls
+            if (IsKeyPressed(KEY_LEFT))
+            {
+                cutoff_hz = cutoff_hz * 4 / 5;
+            }
+
+            if (IsKeyPressed(KEY_RIGHT))
+            {
+                cutoff_hz = cutoff_hz * 5 / 4;
+            }
+
+            // cutoff
+            if (cutoff_hz < 20)
+            {
+                cutoff_hz = 20;
+            }
+
+            if (cutoff_hz > 20000)
+            {
+                cutoff_hz = 20000;
+            }
+
+            // resonance
+            if (IsKeyPressed(KEY_DOWN))
+            {
+                resonance_q100 -= 10;
+            }
+
+            if (IsKeyPressed(KEY_UP))
+            {
+                resonance_q100 += 10;
+            }
+
+            if (resonance_q100 < 50)
+            {
+                resonance_q100 = 50;
+            }
+
+            if (resonance_q100 > 500)
+            {
+                resonance_q100 = 500;
+            }
+
+            // attack
+            if (IsKeyPressed(KEY_ONE))
+            {
+                attack_ms -= 50;
+            }
+
+            if (IsKeyPressed(KEY_TWO))
+            {
+                attack_ms += 50;
+            }
+
+            if (attack_ms < 0)
+            {
+                attack_ms = 0;
+            }
+
+            if (attack_ms > 5000)
+            {
+                attack_ms = 5000;
+            }
+
+            // decay
+            if (IsKeyPressed(KEY_THREE))
+            {
+                decay_ms -= 50;
+            }
+
+            if (IsKeyPressed(KEY_FOUR))
+            {
+                decay_ms += 50;
+            }
+
+            if (decay_ms < 0)
+            {
+                decay_ms = 0;
+            }
+
+            if (decay_ms > 5000)
+            {
+                decay_ms = 5000;
+            }
+
+            // sustain
+            if (IsKeyPressed(KEY_FIVE))
+            {
+                sustain_percent -= 5;
+            }
+
+            if (IsKeyPressed(KEY_SIX))
+            {
+                sustain_percent += 5;
+            }
+
+            if (sustain_percent < 0)
+            {
+                sustain_percent = 0;
+            }
+
+            if (sustain_percent > 100)
+            {
+                sustain_percent = 100;
+            }
+
+            // release
+            if (IsKeyPressed(KEY_SEVEN))
+            {
+                release_ms -= 50;
+            }
+
+            if (IsKeyPressed(KEY_EIGHT))
+            {
+                release_ms += 50;
+            }
+
+            if (release_ms < 0)
+            {
+                release_ms = 0;
+            }
+
+            if (release_ms > 5000)
+            {
+                release_ms = 5000;
+            }
+
+            atomic_store(&app.requested_resonance_q100, resonance_q100);
+            atomic_store(&app.requested_cutoff_hz, cutoff_hz);
+            atomic_store(&app.requested_attack_ms, attack_ms);
+            atomic_store(&app.requested_decay_ms, decay_ms);
+            atomic_store(&app.requested_sustain_percent, sustain_percent);
+            atomic_store(&app.requested_release_ms, release_ms);
+
+            for (int n = 0; n < piano_key_count; n++)
+            {
+                MidiEvent event = {
+                    .note = 60 + n + octave_offset,
+                    .velocity = 100,
+                };
+
+                if (IsKeyPressed(piano_keys[n]))
                 {
-                    fprintf(stderr, "Keyboard event queue is full\n");
+                    event.type = MIDI_NOTE_ON;
+                    active_notes[n] = 60 + n + octave_offset;
+                    event.note = active_notes[n];
+
+                    if (!event_queue_push(&app.events, event))
+                    {
+                        fprintf(stderr, "Keyboard event queue is full\n");
+                    }
+                }
+
+                if (IsKeyReleased(piano_keys[n]) && active_notes[n] != -1)
+                {
+                    event.type = MIDI_NOTE_OFF;
+                    event.velocity = 0;
+                    event.note = active_notes[n];
+                    active_notes[n] = -1;
+
+                    if (!event_queue_push(&app.events, event))
+                    {
+                        fprintf(stderr, "Keyboard event queue is full\n");
+                    }
                 }
             }
         }
-
         if (midi_available)
         {
             MidiEvent event;
@@ -444,28 +481,45 @@ int main(int argc, char *argv[])
             }
         }
 
-        scope_display_update(&display, &app.scope);
+        if (!headless)
+        {
+            scope_display_update(&display, &app.scope);
 
-        // drawing
-        BeginDrawing();
-        ClearBackground(BLACK);
-        scope_display_draw(&display);
-        DrawText(TextFormat("Wave format: %s  F1", oscillator_get_wave_desc(waveform)),
-                 141,
-                 10,
-                 14,
-                 WHITE);
-        DrawText(TextFormat("Cutoff: %d Hz  Left/Right", cutoff_hz), 390, 10, 14, WHITE);
-        DrawText(
-            TextFormat("Resonance Q: %.2f  Up/Down", resonance_q100 / 100.0f), 390, 28, 14, WHITE);
-        DrawText(TextFormat("Attack: %d ms 1/2", attack_ms), 70, 410, 16, WHITE);
-        DrawText(TextFormat("Decay: %d ms 3/4", decay_ms), 410, 410, 16, WHITE);
-        DrawText(TextFormat("Sustain: %d%% ms 5/6", sustain_percent), 70, 440, 16, WHITE);
-        DrawText(TextFormat("Release: %d ms  7/8", release_ms), 410, 440, 16, WHITE);
-        EndDrawing();
+            // drawing
+            BeginDrawing();
+            ClearBackground(BLACK);
+            scope_display_draw(&display);
+            DrawText(TextFormat("Wave format: %s  F1", oscillator_get_wave_desc(waveform)),
+                     141,
+                     10,
+                     14,
+                     WHITE);
+            DrawText(TextFormat("Cutoff: %d Hz  Left/Right", cutoff_hz), 390, 10, 14, WHITE);
+            DrawText(TextFormat("Resonance Q: %.2f  Up/Down", resonance_q100 / 100.0f),
+                     390,
+                     28,
+                     14,
+                     WHITE);
+            DrawText(TextFormat("Attack: %d ms 1/2", attack_ms), 70, 410, 16, WHITE);
+            DrawText(TextFormat("Decay: %d ms 3/4", decay_ms), 410, 410, 16, WHITE);
+            DrawText(TextFormat("Sustain: %d%% ms 5/6", sustain_percent), 70, 440, 16, WHITE);
+            DrawText(TextFormat("Release: %d ms  7/8", release_ms), 410, 440, 16, WHITE);
+            EndDrawing();
+        }
+
+        if (headless)
+        {
+            struct timespec delay = {
+                .tv_sec = 0,
+                .tv_nsec = 1000000,
+            };
+
+            nanosleep(&delay, NULL);
+        }
     }
     ma_device_uninit(&device);
     midi_input_close(&midi);
-    CloseWindow();
+    if (!headless)
+        CloseWindow();
     return 0;
 }
